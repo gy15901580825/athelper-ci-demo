@@ -36,10 +36,11 @@ jobs:
       - name: Install athelper-probe CLI
         run: |
           VERSION="v0.1.1"
-          curl -sSL "https://github.com/gy15901580825/at_helper_cli/releases/download/${VERSION}/athelper-probe-linux-x86_64" \
+          sudo curl -sSL "https://github.com/gy15901580825/at_helper_cli/releases/download/${VERSION}/athelper-probe-linux-x86_64" \
             -o /usr/local/bin/athelper-probe
-          chmod +x /usr/local/bin/athelper-probe
-          athelper-probe --version
+          sudo chmod +x /usr/local/bin/athelper-probe
+          # Skip --version: PyInstaller binary fails click's auto-version lookup.
+          athelper-probe --help | head -1
 
       - name: Run probe sweep against demo-real
         env:
