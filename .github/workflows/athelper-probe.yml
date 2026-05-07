@@ -1,0 +1,70 @@
+name: athelper-probe
+
+# Demo: ATHelper red-team probes wired into a customer's CI/CD.
+# Targets demo-real.at-helper.com (Llama 3.3 70B on Azure Foundry).
+#
+# Triggers:
+#   - manual: Actions tab → "athelper-probe" → Run workflow
+#   - cron: every Monday 06:00 UTC (so the Security tab always shows fresh data)
+#   - on PR (opt-in): change the `pull_request` block below to enable per-PR scans
+
+on:
+  workflow_dispatch:
+    inputs:
+      probes:
+        description: 'Probe selection (default: all)'
+        required: false
+        default: 'all'
+      per-run-cap:
+        description: 'Per-run cost cap in USD'
+        required: false
+        default: '5.00'
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+
+permissions:
+  contents: read
+  security-events: write   # required for code-scanning SARIF upload
+  pull-requests: write     # if you wire pull_request triggers
+
+jobs:
+  redteam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install athelper-probe CLI
+        run: |
+          VERSION="v0.1.1"
+          curl -sSL "https://github.com/gy15901580825/at_helper_cli/releases/download/${VERSION}/athelper-probe-linux-x86_64" \
+            -o /usr/local/bin/athelper-probe
+          chmod +x /usr/local/bin/athelper-probe
+          athelper-probe --version
+
+      - name: Run probe sweep against demo-real
+        env:
+          ATHELPER_API_TOKEN: ${{ secrets.ATHELPER_API_TOKEN }}
+        run: |
+          PROBES="${{ github.event.inputs.probes || 'all' }}"
+          CAP="${{ github.event.inputs.per-run-cap || '5.00' }}"
+          athelper-probe run \
+            --target demo-real-target.json \
+            --probes "$PROBES" \
+            --per-run-cap "$CAP" \
+            --max-wait 1800 \
+            --format sarif --out report.sarif
+
+      - name: Upload SARIF to GitHub code-scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: report.sarif
+          category: athelper
+
+      - name: Archive raw report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athelper-sarif-${{ github.run_id }}
+          path: report.sarif
+          retention-days: 30

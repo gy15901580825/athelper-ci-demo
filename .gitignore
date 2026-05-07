@@ -1,0 +1,7 @@
+report.sarif
+report.html
+report.xml
+*.log
+.env
+__pycache__/
+.venv/
