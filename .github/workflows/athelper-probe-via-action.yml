@@ -1,0 +1,49 @@
+name: athelper-probe-via-action
+
+# Companion workflow that exercises gy15901580825/athelper-probe-action.
+# Kept separate from athelper-probe.yml (the direct-CLI flow) so a regression
+# in the action doesn't break the recurring Monday cron.
+#
+# Trigger manually from the Actions tab. After v2 stabilizes this can replace
+# athelper-probe.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action-ref:
+        description: 'Ref of athelper-probe-action to use (branch, tag, or SHA)'
+        required: false
+        default: 'v2'
+      probes:
+        description: 'Comma-separated probe ids or "all"'
+        required: false
+        default: 'all'
+      threshold:
+        description: 'warn | block-on-critical | block-on-high'
+        required: false
+        default: 'warn'
+      per-run-cap:
+        description: 'Per-run cost cap in USD'
+        required: false
+        default: '5.00'
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+  checks: write
+
+jobs:
+  redteam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run ATHelper probes (via action)
+        uses: gy15901580825/athelper-probe-action@v2-cli-flags
+        with:
+          api-token: ${{ secrets.ATHELPER_API_TOKEN }}
+          target-config: demo-real-target.json
+          probes: ${{ github.event.inputs.probes || 'all' }}
+          threshold: ${{ github.event.inputs.threshold || 'warn' }}
+          per-run-cap: ${{ github.event.inputs.per-run-cap || '5.00' }}
